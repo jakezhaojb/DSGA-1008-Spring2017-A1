@@ -50,17 +50,18 @@ kwargs = {'num_workers': 1, 'pin_memory': True} if args.cuda else {}
 
 print('loading data!')
 trainset_labeled = pickle.load(open("train_labeled.p", "rb"))
+validset = pickle.load(open("validation.p", "rb"))
 #trainset_unlabeled = pickle.load(open("train_unlabeled.p", "rb"))
 
 train_loader = torch.utils.data.DataLoader(trainset_labeled, batch_size=64, shuffle=True, **kwargs)
+valid_loader = torch.utils.data.DataLoader(validset, batch_size=64, shuffle=True)
 
-
-test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST('../data', train=False, transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.1307,), (0.3081,))
-                   ])),
-    batch_size=args.batch_size, shuffle=True, **kwargs)
+# test_loader = torch.utils.data.DataLoader(
+#     datasets.MNIST('../data', train=False, transform=transforms.Compose([
+#                        transforms.ToTensor(),
+#                        transforms.Normalize((0.1307,), (0.3081,))
+#                    ])),
+#     batch_size=args.batch_size, shuffle=True, **kwargs)
 
 
 class Net(nn.Module):
@@ -103,11 +104,11 @@ def train(epoch):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.data[0]))
 
-def test(epoch):
+def test(epoch, valid_loader):
     model.eval()
     test_loss = 0
     correct = 0
-    for data, target in test_loader:
+    for data, target in valid_loader:
         if args.cuda:
             data, target = data.cuda(), target.cuda()
         data, target = Variable(data, volatile=True), Variable(target)
@@ -116,14 +117,13 @@ def test(epoch):
         pred = output.data.max(1)[1] # get the index of the max log-probability
         correct += pred.eq(target.data).cpu().sum()
 
-    test_loss = test_loss
-    test_loss /= len(test_loader) # loss function already averages over batch size
+    test_loss /= len(valid_loader) # loss function already averages over batch size
     print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
+        test_loss, correct, len(valid_loader.dataset),
+        100. * correct / len(valid_loader.dataset)))
 
 
 for epoch in range(1, args.epochs + 1):
     train(epoch)
-    test(epoch)
+    test(epoch, valid_loader)
 
